@@ -51,6 +51,8 @@ $MaximumErrorCount                   256
 $MaximumFunctionCount                4096
 $MaximumHistoryCount                 4096
 $MaximumVariableCount                4096
+$NativeCommandExceptionPreference    Continue
+$NativeCommandPipeFailPreference     SilentlyContinue
 $OFS                                 (Space character (" "))
 $OutputEncoding                      ASCIIEncoding object
 $ProgressPreference                  Continue
@@ -822,6 +824,105 @@ To find the current number of variables on the system, type:
 
 (get-variable).count
 
+$NativeCommandExceptionPreference
+$NativeCommandPipeFailPreference
+These determine how Windows PowerShell responds to a non-zero exit code
+from a native command.
+
+$NativeCommandExceptionPreference determines which exception is thrown for 
+native commands that fail (per $NativeCommandPipeFailPreference).
+ 
+Valid values:
+Continue:           Throw only a RuntimeException to be handled by Powershell
+(default)           error handling: terminates if $ErrorActionPreference is “stop”.
+
+Stop:               Throw an ExitException to exit the shell.
+
+Other values have no effect, giving a result equivalent to Continue.
+
+
+$NativeCommandPipeFailPreference controls whether or not an Exception is thrown for 
+native commands that are not part of an if condition, loop test or expression.
+It provides functionality like bash { set -e/+e } and {set -o/+o pipefail}.
+
+Valid values:
+Continue:           Throw only if the native command with a non-zero exit code
+is the last command in the pipeline. Like bash ‘set -e +o pipe fail’
+$LastExitCode will be the exit code of this native command.
+The exception is handled in the normal way per ErrorActionPreference.
+
+SilentlyContinue:   No Error is thrown and execution continues without interruption.
+(Default)           
+Analog of bash { set +e }
+
+Stop:               Throw for any native command in the pipeline with a 
+non-zero exit code. Like bash ‘set -e -o pipefail’
+$LastExitCode will be per the first non-zero native command exit code.
+The exception is handled in the normal way per ErrorActionPreference.
+
+Other values have no effect, giving a result equivalent to SilentlyContinue
+
+#EXAMPLES
+
+These examples show the effect of the different values of
+$NativeErrorPreference and $ErrorActionPreference variables.
+
+This example shows the effect of the SilentlyContinue value, which is the
+default.
+
+PS> $NativeCommandPipeFailPreference
+SilentlyContinue# Display the value of the preference.
+
+PS> ls nofile.txt 
+ls: nofile.txt: No such file or directory
+
+This example shows the effect of the Continue value.
+
+PS> $NativeCommandPipeFailPreference="Continue"
+PS> ls nofile.txt
+ls: nofile.txt: No such file or directory
+Program 'ls' failed: Exit Code 1
+At line:1 char:1
++ ls nofile.txt
++ ~~~~~~~~~~~~~.
+At line:1 char:1
++ ls nofile.txt
++ ~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:) [], ApplicationFailedToCompleteException
+    + FullyQualifiedErrorId : NativeCommandFailure
+
+PS> ls nofile.txt |cat -
+ls: nofile.txt: No such file or directory
+#Exception is not thrown
+
+This example shows the effect of the "Stop" value.
+
+PS> $NativeCommandPipeFailPreference="Stop"
+PS> ls nofile.txt
+ls: nofile.txt: No such file or directory
+Program 'ls' failed: Exit Code 1
+At line:1 char:1
++ ls nofile.txt|cat -
++ ~~~~~~~~~~~~~.
+At line:1 char:1
++ ls nofile.txt|cat -
++ ~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:) [], ApplicationFailedToCompleteException
+    + FullyQualifiedErrorId : NativeCommandFailure
+
+This example shows the effect of using an if statement
+
+PS> if (ls nofile.txt) {echo "File Found"} else {echo "File Not Found"} 
+ls: nofile.txt: No such file or directory
+File Not Found
+#Exception is not thrown
+    
+This example shows the effect of using an expression.
+
+PS> if (! (ls nofile.txt))  {echo "File Not Found"}   
+ls: nofile.txt: No such file or directory
+File Not Found
+#Exception is not thrown
 
 $OFS
 Output Field Separator. Specifies the character that separates the
